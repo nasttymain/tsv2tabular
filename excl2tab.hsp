@@ -1,0 +1,145 @@
+#packopt hide 1
+#packopt name "excl2tab.exe"
+#include "User32.as"
+#include "Kernel32.as
+
+*init
+	v = GlobalAlloc($0042, 65536)
+	gosub *abortIfError
+	cliptext_mh = v
+	
+	sdim tsvtable, 262144
+	sdim tabulartable, 1048576
+	
+	sdim oneline, 65536
+	sdim elems, 256, 256
+	
+	dim column_count
+	column_count = 0
+	sdim column_indicator, 65536
+	column_indicator = ""
+	
+	screen 0, 320, 240
+	title "Tab-Spaced 2 Tabular"
+	pos 0, 0
+	mesbox tsvtable, 320, 208, 1
+	pos 0, 208
+	objsize 320, 32
+	button gosub "•ÏŠ·", *event_generate
+	stop
+*event_generate
+	gosub *convert2Tabular
+	gosub *copy2ClipBoard
+	return
+*convert2Tabular
+	column_count = 0
+	notesel tsvtable
+	repeat notemax
+		notesel tsvtable
+		noteget oneline, cnt
+		split oneline, "\t", elems
+		if column_count < stat{
+			column_count = stat
+		}
+	loop
+	
+	column_indicator = "|"
+	repeat column_count
+		column_indicator += "c|"
+	loop
+	
+	tabulartable = ""
+	tabulartable += "\\begin{table}[ht]" + "\n"
+	tabulartable += "\\caption{}" + "\n"
+	tabulartable += "\\label{}" + "\n"
+	tabulartable += "\\centering" + "\n"
+	tabulartable += "\\begin{tabular}{" + column_indicator + "} \\hline" + "\n"
+	
+	notesel tsvtable
+	repeat notemax
+		repeat length(elems)
+			elems(cnt) = ""
+		loop
+		notesel tsvtable
+		noteget oneline, cnt
+		strrep oneline, "[", "\\mathrm{["
+		strrep oneline, "]", "]}"
+		split oneline, "\t", elems
+		repeat column_count
+			if elems(cnt) != ""{
+				tabulartable += "$" + elems(cnt) + "$ "
+			}else{
+				tabulartable += " "
+			}
+			if cnt != column_count - 1{
+				tabulartable += "& "
+			}
+		loop
+		tabulartable +=" \\\\ \\hline \n"
+	loop
+	tabulartable += "\\end{tabular}" + "\n"
+	tabulartable += "\\end{table}" + "\n"
+	dialog "Copied"
+	return
+*copy2ClipBoard
+	v = GlobalAlloc($0042, 65536)
+	gosub *abortIfError
+	cliptext_mh = v
+	logmes "GlobalAlloc"
+
+	v = GlobalLock(cliptext_mh)
+	gosub *abortIfError
+	logmes "GlobalLock"
+	
+	cliptext_hnd = v
+	dupptr cliptext, cliptext_hnd, 65536 - 1, vartype("str")
+	cliptext = tabulartable
+	logmes cliptext_hnd
+	
+	v = OpenClipboard(hwnd)
+	gosub *abortIfError
+	logmes "OpenClipBoard"
+	
+	v = EmptyClipboard()
+	gosub *abortIfError
+	logmes "EmptyClipBoard"
+	
+	v = SetClipboardData(1, cliptext_mh)
+	gosub *abortIfError
+	logmes "SetClipBoard"
+	
+	v = GlobalUnlock(cliptext_mh)
+	if GetLastError() != 0{
+		dialog "GlobalUnlock Error" + GetLastError()
+		end
+	}
+	logmes "GlobalUnlock"
+	
+	v = CloseClipboard()
+	gosub *abortIfError
+	logmes "CloseClipBoard"
+	
+	
+	v = GlobalFree(cliptext_mh)
+	if v != 0{
+		dialog "GlobalFree Error" + GetLastError()
+		end
+	}
+	logmes "GlobalFree"
+	cliptext_mh = 0
+	
+	
+	
+	return
+
+*abortIfError
+	if v = 0{
+		//Ž¸”s
+		e = GetLastError()
+		sdim errmes, 4096
+		v = FormatMessage($00001200, 0, e, 0, varptr(errmes), varsize(errmes) - 1, 0)
+		dialog "Error. GetLastError(" + e + ") : " + errmes
+		end
+	}
+	return
+	
